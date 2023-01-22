@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:isar/isar.dart';
 import 'package:teeth_timer/state_model.dart';
+import 'package:teeth_timer/timer_widget.dart';
 
 void main() async {
   await Isar.open([StateModelSchema]);
@@ -18,7 +19,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Teeth Timer',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        primaryColor: Colors.cyan[200],
       ),
       home: const MyHomePage(),
     );
@@ -33,6 +34,8 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
+  static const maxDuration = Duration(hours: 2);
+
   late StateModel _stateModel;
 
   Timer? _timer;
@@ -95,17 +98,53 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     final nowMillis = DateTime.now().millisecondsSinceEpoch;
     final usedMillis = nowMillis - (_stateModel.startedAtMillis ?? nowMillis);
     final remindedMillis = _stateModel.currentReminderMillis - usedMillis;
-    final isOverdue = remindedMillis < 0;
     return Scaffold(
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Stack(
           children: <Widget>[
-            Text(_formatDuration(Duration(milliseconds: remindedMillis)),
-                style: Theme.of(context).textTheme.headline4),
-            ElevatedButton(
-              onPressed: switchTimer,
-              child: Text(_timer == null ? 'Start' : 'Stop'),
+            Center(
+              child: FractionallySizedBox(
+                widthFactor: 0.7,
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: TimerWidget(
+                    currentMillis: remindedMillis,
+                    maxMillis: maxDuration.inMilliseconds,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 40,
+              left: 0,
+              right: 0,
+              child: Container(
+                alignment: Alignment.center,
+                child: FractionallySizedBox(
+                  widthFactor: 0.8,
+                  child: SizedBox(
+                    height: 60,
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        backgroundColor: remindedMillis >= 0
+                            ? Theme.of(context).primaryColor
+                            : Colors.red,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      onPressed: switchTimer,
+                      child: Text(
+                        _timer == null ? 'Старт' : 'Стоп',
+                        style: Theme.of(context)
+                            .textTheme
+                            .headline4
+                            ?.copyWith(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -130,7 +169,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       ..year = now.year
       ..month = now.month
       ..day = now.day
-      ..currentReminderMillis = const Duration(seconds: 10).inMilliseconds;
+      ..currentReminderMillis = maxDuration.inMilliseconds;
 
     await _saveStateModel(stateModel);
 
@@ -192,20 +231,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   void _startTimer() {
     _timer = Timer.periodic(
-      const Duration(milliseconds: 300),
+      const Duration(milliseconds: 100),
       (timer) {
         setState(() {});
       },
     );
-  }
-
-  String _formatDuration(Duration duration) {
-    final String hours = duration.inHours.abs().toString().padLeft(2, '0');
-    final String minutes =
-        duration.inMinutes.remainder(60).abs().toString().padLeft(2, '0');
-    final String seconds =
-        duration.inSeconds.remainder(60).abs().toString().padLeft(2, '0');
-
-    return '$hours:$minutes:$seconds';
   }
 }
