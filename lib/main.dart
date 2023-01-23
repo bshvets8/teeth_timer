@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:isar/isar.dart';
 import 'package:teeth_timer/state_model.dart';
@@ -7,7 +8,6 @@ import 'package:teeth_timer/timer_widget.dart';
 
 void main() async {
   await Isar.open([StateModelSchema]);
-
   runApp(const MyApp());
 }
 
@@ -17,6 +17,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Teeth Timer',
       theme: ThemeData(
         primaryColor: Colors.cyan[200],
@@ -68,10 +69,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) async {
     super.didChangeAppLifecycleState(state);
 
-    _isLoading = true;
-    setState(() {});
-
     if (state == AppLifecycleState.resumed) {
+      _isLoading = true;
+      setState(() {});
       _stateModel = await _getStateModel();
 
       if (_stateModel.startedAtMillis != null) {
@@ -98,55 +98,138 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     final nowMillis = DateTime.now().millisecondsSinceEpoch;
     final usedMillis = nowMillis - (_stateModel.startedAtMillis ?? nowMillis);
     final remindedMillis = _stateModel.currentReminderMillis - usedMillis;
+
     return Scaffold(
-      body: Center(
-        child: Stack(
-          children: <Widget>[
-            Center(
-              child: FractionallySizedBox(
-                widthFactor: 0.7,
-                child: AspectRatio(
-                  aspectRatio: 1,
-                  child: TimerWidget(
-                    currentMillis: remindedMillis,
-                    maxMillis: maxDuration.inMilliseconds,
+      body: SafeArea(
+        child: Center(
+          child: Stack(
+            children: <Widget>[
+              Center(
+                child: FractionallySizedBox(
+                  widthFactor: 0.7,
+                  child: AspectRatio(
+                    aspectRatio: 1,
+                    child: TimerWidget(
+                      currentMillis: remindedMillis,
+                      maxMillis: maxDuration.inMilliseconds,
+                    ),
                   ),
                 ),
               ),
-            ),
-            Positioned(
-              bottom: 40,
-              left: 0,
-              right: 0,
-              child: Container(
-                alignment: Alignment.center,
-                child: FractionallySizedBox(
-                  widthFactor: 0.8,
-                  child: SizedBox(
-                    height: 60,
-                    child: TextButton(
-                      style: TextButton.styleFrom(
-                        backgroundColor: remindedMillis >= 0
-                            ? Theme.of(context).primaryColor
-                            : Colors.red,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
+              Positioned(
+                top: 0,
+                right: 0,
+                child: IconButton(
+                  icon: Icon(
+                    Icons.edit,
+                    color: Theme.of(context).primaryColor,
+                  ),
+                  onPressed: _timer != null
+                      ? null
+                      : () async {
+                          Duration selected = Duration(
+                            milliseconds: remindedMillis,
+                          );
+                          await showModalBottomSheet<void>(
+                            context: context,
+                            builder: (context) {
+                              return Column(
+                                children: [
+                                  const SizedBox(height: 20),
+                                  SizedBox(
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        CupertinoTimerPicker(
+                                          onTimerDurationChanged: (value) {
+                                            selected = value;
+                                          },
+                                          initialTimerDuration: selected,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  FractionallySizedBox(
+                                    widthFactor: 0.8,
+                                    child: SizedBox(
+                                      height: 60,
+                                      child: TextButton(
+                                        style: TextButton.styleFrom(
+                                          backgroundColor:
+                                              Theme.of(context).primaryColor,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(30),
+                                          ),
+                                        ),
+                                        onPressed: () {
+                                          if (selected.inMilliseconds >
+                                              maxDuration.inMilliseconds) {
+                                            return;
+                                          }
+
+                                          _stateModel.currentReminderMillis =
+                                              selected.inMilliseconds;
+                                          _saveStateModel(_stateModel);
+                                          Navigator.pop(context);
+                                          setState(() {});
+                                        },
+                                        child: Text(
+                                          'Зберегти',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .headline4
+                                              ?.copyWith(color: Colors.white),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 60),
+                                ],
+                              );
+                            },
+                          );
+
+                          setState(() {});
+                        },
+                ),
+              ),
+              Positioned(
+                bottom: 40,
+                left: 0,
+                right: 0,
+                child: Container(
+                  alignment: Alignment.center,
+                  child: FractionallySizedBox(
+                    widthFactor: 0.8,
+                    child: SizedBox(
+                      height: 60,
+                      child: TextButton(
+                        style: TextButton.styleFrom(
+                          backgroundColor: remindedMillis >= 0
+                              ? Theme.of(context).primaryColor
+                              : Colors.red,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
                         ),
-                      ),
-                      onPressed: switchTimer,
-                      child: Text(
-                        _timer == null ? 'Старт' : 'Стоп',
-                        style: Theme.of(context)
-                            .textTheme
-                            .headline4
-                            ?.copyWith(color: Colors.white),
+                        onPressed: switchTimer,
+                        child: Text(
+                          _timer == null ? 'Старт' : 'Стоп',
+                          style: Theme.of(context)
+                              .textTheme
+                              .headline4
+                              ?.copyWith(color: Colors.white),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -163,7 +246,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   Future<StateModel> _createStateModel() async {
-    final now = DateTime.now();
+    final now = DateTime.now().subtract(const Duration(hours: 12));
 
     final stateModel = StateModel()
       ..year = now.year
@@ -177,7 +260,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   Future<StateModel?> _loadStateModel() {
-    final now = DateTime.now();
+    final now = DateTime.now().subtract(const Duration(hours: 12));
 
     return Isar.getInstance()!
         .stateModels
