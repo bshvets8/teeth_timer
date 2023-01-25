@@ -248,29 +248,45 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Future<StateModel> _createStateModel() async {
     final now = DateTime.now().subtract(const Duration(hours: 12));
 
-    final stateModel = StateModel()
+    final todayModel = StateModel()
       ..year = now.year
       ..month = now.month
       ..day = now.day
       ..currentReminderMillis = maxDuration.inMilliseconds;
 
-    await _saveStateModel(stateModel);
+    final yesterdayModel = await _loadStateModelForDate(
+      now.subtract(const Duration(days: 1)),
+    );
+    if (yesterdayModel != null && yesterdayModel.startedAtMillis != null) {
+      yesterdayModel
+        ..currentReminderMillis -=
+            now.millisecondsSinceEpoch - yesterdayModel.startedAtMillis!
+        ..startedAtMillis = null;
 
-    return stateModel;
+      unawaited(_saveStateModel(yesterdayModel));
+
+      todayModel.startedAtMillis = now.millisecondsSinceEpoch;
+    }
+
+    await _saveStateModel(todayModel);
+
+    return todayModel;
   }
 
   Future<StateModel?> _loadStateModel() {
     final now = DateTime.now().subtract(const Duration(hours: 12));
-
-    return Isar.getInstance()!
-        .stateModels
-        .where(sort: Sort.desc)
-        .filter()
-        .yearEqualTo(now.year)
-        .monthEqualTo(now.month)
-        .dayEqualTo(now.day)
-        .findFirst();
+    return _loadStateModelForDate(now);
   }
+
+  Future<StateModel?> _loadStateModelForDate(DateTime dateTime) =>
+      Isar.getInstance()!
+          .stateModels
+          .where(sort: Sort.desc)
+          .filter()
+          .yearEqualTo(dateTime.year)
+          .monthEqualTo(dateTime.month)
+          .dayEqualTo(dateTime.day)
+          .findFirst();
 
   Future<void> _saveStateModel(StateModel stateModel) async {
     final isar = Isar.getInstance()!;
